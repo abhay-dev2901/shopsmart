@@ -63,15 +63,24 @@ jobs:
       working-directory: ./server
       run: npm ci
     
-    - name: Setup database
+    - name: Generate Prisma Client
       working-directory: ./server
-      run: npx prisma migrate deploy
-      continue-on-error: true
+      run: npx prisma generate
     
-    - name: Run tests
+    - name: Reset test database
       working-directory: ./server
-      run: npm test -- --coverage
+      run: |
+        rm -f prisma/test.db
+        npx prisma db push --skip-generate --accept-data-loss
       continue-on-error: false
+    
+    - name: Initialize test database
+      working-directory: ./server
+      run: node scripts/setup-db.js
+    
+    - name: Run tests with coverage
+      working-directory: ./server
+      run: npm test -- --coverage --forceExit
     
     - name: Upload coverage reports
       if: always()

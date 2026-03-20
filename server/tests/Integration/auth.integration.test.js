@@ -3,6 +3,30 @@ import app from "../../src/app.js";
 import prisma from "../../src/db.js";
 
 describe("Auth Integration Tests", () => {
+  beforeAll(async () => {
+    // Clean up any existing test users before running tests
+    console.log("🧹 Cleaning up existing test users...");
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          contains: "integration",
+        },
+      },
+    });
+  });
+
+  afterAll(async () => {
+    // Clean up test users
+    console.log("🧹 Cleaning test users...");
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          contains: "integration",
+        },
+      },
+    });
+  });
+
   it("POST /api/auth/signup - should create a new user", async () => {
     const res = await request(app).post("/api/auth/signup").send({
       name: "Integration User",

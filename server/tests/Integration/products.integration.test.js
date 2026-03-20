@@ -14,24 +14,37 @@ describe("Products Integration Tests", () => {
   let testProductId;
 
   beforeAll(async () => {
-    // Create a test product for the integration tests
-    const product = await prisma.product.create({
-      data: {
-        name: "Integration Product",
-        price: 99.99,
-        category: "electronics",
-      },
-    });
-    testProductId = product.id;
+    try {
+      console.log("🔄 Creating test product...");
+      // Create a test product for the integration tests
+      const product = await prisma.product.create({
+        data: {
+          name: "Integration Product",
+          price: 99.99,
+          category: "electronics",
+        },
+      });
+      testProductId = product.id;
+      console.log(`✅ Test product created with ID: ${testProductId}`);
+    } catch (error) {
+      console.error("❌ Failed to create test product:", error.message);
+      throw error;
+    }
   });
 
   afterAll(async () => {
-    // Clean up products created in this test suite
-    await prisma.product.deleteMany({
-      where: {
-        category: "electronics",
-      },
-    });
+    try {
+      console.log("🧹 Cleaning up test products...");
+      // Clean up products created in this test suite
+      await prisma.product.deleteMany({
+        where: {
+          category: "electronics",
+        },
+      });
+      console.log("✅ Test product cleanup complete");
+    } catch (error) {
+      console.error("❌ Failed to cleanup test products:", error.message);
+    }
   });
 
   it("POST /api/products - should create a new product", async () => {

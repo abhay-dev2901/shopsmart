@@ -8,5 +8,12 @@ module.exports = {
   },
   transformIgnorePatterns: [
     "node_modules/(?!(@prisma)/)"
+  ],
+  collectCoverageFrom: [
+    "src/**/*.js",
+    "!src/index.js"
+  ],
+  coveragePathIgnorePatterns: [
+    "/node_modules/"
   ]
 };
