@@ -41,7 +41,7 @@ router.get("/:id", async (req, res) => {
 // CREATE product (admin only - in real app, add role verification)
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { name, description, price, stock, image, category } = req.body;
+    const { name, description = "", price, stock, image, category } = req.body;
 
     if (!name || !price || !category) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -50,7 +50,7 @@ router.post("/", verifyToken, async (req, res) => {
     const product = await prisma.product.create({
       data: {
         name,
-        description,
+        description: description || "",
         price: parseFloat(price),
         stock: parseInt(stock) || 0,
         image,

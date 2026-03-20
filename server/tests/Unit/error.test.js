@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../src/app.js";
+import app from "../../src/app.js";
 
 describe("Error Handler", () => {
   it("should return 500 on server error", async () => {

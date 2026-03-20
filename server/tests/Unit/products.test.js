@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../src/app.js";
+import app from "../../src/app.js";
 
 describe("Products API", () => {
   it("should respond to /api/products route with valid status", async () => {
