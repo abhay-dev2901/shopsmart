@@ -31,15 +31,24 @@ app.use("/api/products", productsRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/orders", ordersRoutes);
 
-// 404 handler
+// ✅ ADD test route (for error testing)
+app.get("/api/error-test", (req, res) => {
+  throw new Error("Test error");
+});
+
+// ✅ 404 handler FIRST
 app.use((req, res) => {
   res.status(404).json({ message: "Route not found" });
 });
 
-// Error handler
+// ✅ Error handler LAST
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Internal server error", error: err.message });
+
+  res.status(500).json({
+    message: "Internal server error",
+    error: err.message,
+  });
 });
 
 export default app;

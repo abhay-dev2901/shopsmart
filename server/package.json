@@ -4,14 +4,21 @@
   "description": "Backend API for ShopSmart",
   "type": "module",
   "main": "src/index.js",
+
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "jest",
-    "lint": "echo 'No linter configured yet'",
+
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+
+    "lint": "eslint src/ --max-warnings 0 || true",
+    "lint:fix": "eslint src/ --fix || true",
+
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
   },
+
   "dependencies": {
     "@prisma/client": "^5.8.0",
     "bcryptjs": "^2.4.3",
@@ -20,6 +27,7 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2"
   },
+
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^20.11.5",
