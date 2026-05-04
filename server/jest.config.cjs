@@ -3,6 +3,7 @@ module.exports = {
   testMatch: ["**/tests/**/*.test.js"],
   setupFiles: ["<rootDir>/tests/env.cjs"],
   setupFilesAfterEnv: ["<rootDir>/tests/setup.js"],
+  maxWorkers: 1,
   testTimeout: 15000,
   transform: {
     "^.+\\.js$": "babel-jest"
