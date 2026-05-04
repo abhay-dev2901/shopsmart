@@ -28,7 +28,7 @@ export default function Login() {
 
       if (response.ok) {
         const data = await response.json();
-        login(data.user);
+        login(data.user, data.token);
         navigate('/');
       } else {
         setError('Invalid email or password');
@@ -41,7 +41,7 @@ export default function Login() {
           name: email.split('@')[0],
           email,
         };
-        login(userData);
+        login(userData, null);
         navigate('/');
       } else {
         setError('Please fill in all fields');

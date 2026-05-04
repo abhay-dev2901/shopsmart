@@ -36,7 +36,7 @@ export default function Signup() {
 
       if (response.ok) {
         const data = await response.json();
-        signup(data.user);
+        signup(data.user, data.token);
         navigate('/');
       } else {
         setError('Failed to create account');
@@ -49,7 +49,7 @@ export default function Signup() {
           name,
           email,
         };
-        signup(userData);
+        signup(userData, null);
         navigate('/');
       } else {
         setError('Please fill in all fields');

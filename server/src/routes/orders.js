@@ -57,6 +57,71 @@ router.get("/:id", verifyToken, async (req, res) => {
 // CREATE order (checkout)
 router.post("/checkout", verifyToken, async (req, res) => {
   try {
+    const submittedItems = Array.isArray(req.body.items) ? req.body.items : [];
+
+    if (submittedItems.length > 0) {
+      let total = 0;
+      const orderItemsData = [];
+
+      for (const item of submittedItems) {
+        const productId = parseInt(item.id || item.productId);
+        const quantity = parseInt(item.quantity);
+
+        if (!productId || !quantity || quantity < 1) {
+          return res.status(400).json({ message: "Invalid checkout item" });
+        }
+
+        let product = await prisma.product.findUnique({
+          where: { id: productId },
+        });
+
+        if (!product) {
+          product = await prisma.product.create({
+            data: {
+              id: productId,
+              name: item.name || "Checkout item",
+              description: item.description || "",
+              price: parseFloat(item.price) || 0,
+              stock: Math.max(quantity, 1),
+              image: item.image,
+              category: item.category || "General",
+            },
+          });
+        }
+
+        const itemTotal = product.price * quantity;
+        total += itemTotal;
+
+        orderItemsData.push({
+          productId: product.id,
+          quantity,
+          price: product.price,
+        });
+      }
+
+      const order = await prisma.order.create({
+        data: {
+          userId: req.userId,
+          total,
+          items: {
+            create: orderItemsData,
+          },
+        },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      return res.status(201).json({
+        message: "Order created successfully",
+        order,
+      });
+    }
+
     // Get cart items
     const cartItems = await prisma.cartItem.findMany({
       where: { userId: req.userId },
