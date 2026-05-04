@@ -23,6 +23,11 @@ output "ecs_task_family" {
   value       = aws_ecs_task_definition.backend.family
 }
 
+output "ecs_task_execution_role_arn" {
+  description = "Existing IAM role ARN used by the ECS task definition."
+  value       = local.task_execution_role_arn
+}
+
 output "load_balancer_dns_name" {
   description = "Public HTTP endpoint for the backend service."
   value       = aws_lb.app.dns_name

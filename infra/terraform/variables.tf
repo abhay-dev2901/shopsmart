@@ -39,3 +39,9 @@ variable "desired_count" {
   type        = number
   default     = 0
 }
+
+variable "task_execution_role_arn" {
+  description = "Existing IAM role ARN for ECS task execution. Leave null in AWS Academy labs to use arn:aws:iam::<account>:role/LabRole."
+  type        = string
+  default     = null
+}

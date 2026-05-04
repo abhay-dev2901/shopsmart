@@ -6,8 +6,14 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
+  task_execution_role_arn = coalesce(
+    var.task_execution_role_arn,
+    "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/LabRole"
+  )
   tags = {
     Project     = var.project_name
     Environment = var.environment
@@ -197,35 +203,13 @@ resource "aws_ecs_cluster" "main" {
   tags = local.tags
 }
 
-data "aws_iam_policy_document" "ecs_task_assume_role" {
-  statement {
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "ecs_task_execution" {
-  name               = "${local.name_prefix}-ecs-task-execution"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role.json
-  tags               = local.tags
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
-  role       = aws_iam_role.ecs_task_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
 resource "aws_ecs_task_definition" "backend" {
   family                   = "${local.name_prefix}-backend"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.cpu
   memory                   = var.memory
-  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  execution_role_arn       = local.task_execution_role_arn
 
   container_definitions = jsonencode([
     {
