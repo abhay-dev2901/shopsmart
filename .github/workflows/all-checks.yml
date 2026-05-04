@@ -36,11 +36,11 @@ jobs:
     
     - name: Report backend status
       if: success()
-      run: echo "✅ Backend: All checks passed"
+      run: 'echo "✅ Backend: All checks passed"'
     
     - name: Report backend failure
       if: failure()
-      run: echo "❌ Backend: Some checks failed" && exit 1
+      run: 'echo "❌ Backend: Some checks failed" && exit 1'
 
   frontend-status:
     name: Frontend Status Check
@@ -75,11 +75,11 @@ jobs:
     
     - name: Report frontend status
       if: success()
-      run: echo "✅ Frontend: All checks passed"
+      run: 'echo "✅ Frontend: All checks passed"'
     
     - name: Report frontend failure
       if: failure()
-      run: echo "❌ Frontend: Some checks failed" && exit 1
+      run: 'echo "❌ Frontend: Some checks failed" && exit 1'
 
   project-health:
     name: Overall Project Health
