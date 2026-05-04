@@ -30,7 +30,13 @@ export default function Cart() {
         <div className="cart-items">
           {cart.map((item) => (
             <div key={item.id} className="cart-item">
-              <div className="item-image">{item.image}</div>
+              <div className="item-image">
+                {item.image?.startsWith('http') ? (
+                  <img src={item.image} alt={item.name} />
+                ) : (
+                  item.image
+                )}
+              </div>
               <div className="item-details">
                 <h3>{item.name}</h3>
                 <p>${item.price}</p>
@@ -94,9 +100,9 @@ export default function Cart() {
           </div>
 
           {user ? (
-            <button className="btn-primary checkout-btn">
+            <Link to="/checkout" className="btn-primary checkout-btn">
               Proceed to Checkout
-            </button>
+            </Link>
           ) : (
             <>
               <p className="login-prompt">

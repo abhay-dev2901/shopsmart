@@ -61,14 +61,25 @@ export default function Home() {
   const { addToCart } = useCart();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setProducts(MOCK_PRODUCTS);
+    const loadProducts = async () => {
+      try {
+        const response = await fetch('/api/products');
+        if (!response.ok) {
+          throw new Error('Unable to load products');
+        }
+        const data = await response.json();
+        setProducts(data.length > 0 ? data : MOCK_PRODUCTS);
+      } catch (error) {
+        setProducts(MOCK_PRODUCTS);
+      } finally {
       setLoading(false);
-    }, 500);
+      }
+    };
+
+    loadProducts();
   }, []);
 
-  const categories = ['All', ...new Set(MOCK_PRODUCTS.map((p) => p.category))];
+  const categories = ['All', ...new Set(products.map((p) => p.category))];
 
   const filteredProducts =
     selectedCategory === 'All'
@@ -82,12 +93,25 @@ export default function Home() {
   return (
     <div className="home-container">
       <div className="hero">
-        <h1>Welcome to ShopSmart</h1>
-        <p>Discover amazing products at great prices</p>
+        <div>
+          <p className="hero-kicker">Curated daily essentials</p>
+          <h1>Shop smarter without the clutter</h1>
+          <p>
+            Compare practical tech, accessories, and everyday gear in one fast
+            checkout flow.
+          </p>
+        </div>
+        <div className="hero-stats">
+          <span>{products.length}</span>
+          <strong>ready-to-ship products</strong>
+        </div>
       </div>
 
       <div className="filters">
-        <h3>Filter by Category:</h3>
+        <div>
+          <h2>Featured Products</h2>
+          <p>Filter by category and add items to your cart.</p>
+        </div>
         <div className="category-buttons">
           {categories.map((category) => (
             <button
@@ -106,12 +130,22 @@ export default function Home() {
       <div className="products-grid">
         {filteredProducts.map((product) => (
           <div key={product.id} className="product-card">
-            <div className="product-image">{product.image}</div>
+            <div className="product-image">
+              {product.image?.startsWith('http') ? (
+                <img src={product.image} alt={product.name} />
+              ) : (
+                product.image
+              )}
+            </div>
             <div className="product-info">
+              <span className="product-category">{product.category}</span>
               <h3>{product.name}</h3>
               <p className="product-description">{product.description}</p>
+              {product.stock !== undefined && (
+                <span className="stock-pill">{product.stock} in stock</span>
+              )}
               <div className="product-footer">
-                <span className="product-price">${product.price}</span>
+                <span className="product-price">${product.price.toFixed(2)}</span>
                 <button
                   className="add-to-cart-btn"
                   onClick={() => addToCart(product)}

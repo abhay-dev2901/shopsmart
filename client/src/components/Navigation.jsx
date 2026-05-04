@@ -13,7 +13,8 @@ export default function Navigation() {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-logo">
-          🛍️ ShopSmart
+          <span className="logo-mark">S</span>
+          ShopSmart
         </Link>
         
         <ul className="nav-menu">
@@ -56,7 +57,7 @@ export default function Navigation() {
           
           <li className="nav-item">
             <Link to="/cart" className="nav-link cart-link">
-              🛒 Cart ({cartCount})
+              Cart <span>{cartCount}</span>
             </Link>
           </li>
         </ul>
