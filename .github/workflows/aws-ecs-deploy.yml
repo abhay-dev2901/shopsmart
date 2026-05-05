@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION || vars.AWS_REGION || 'us-east-1' }}
+  AWS_REGION: us-east-1
   TERRAFORM_DIR: infra/terraform
 
 jobs:
@@ -82,9 +82,12 @@ jobs:
       contents: read
     outputs:
       ecr_repository_url: ${{ steps.tf_outputs.outputs.ecr_repository_url }}
+      frontend_ecr_repository_url: ${{ steps.tf_outputs.outputs.frontend_ecr_repository_url }}
       ecs_cluster_name: ${{ steps.tf_outputs.outputs.ecs_cluster_name }}
       ecs_service_name: ${{ steps.tf_outputs.outputs.ecs_service_name }}
+      frontend_ecs_service_name: ${{ steps.tf_outputs.outputs.frontend_ecs_service_name }}
       ecs_task_family: ${{ steps.tf_outputs.outputs.ecs_task_family }}
+      frontend_ecs_task_family: ${{ steps.tf_outputs.outputs.frontend_ecs_task_family }}
       load_balancer_dns_name: ${{ steps.tf_outputs.outputs.load_balancer_dns_name }}
 
     steps:
@@ -158,9 +161,12 @@ jobs:
         working-directory: ${{ env.TERRAFORM_DIR }}
         run: |
           echo "ecr_repository_url=$(terraform output -raw ecr_repository_url)" >> "$GITHUB_OUTPUT"
+          echo "frontend_ecr_repository_url=$(terraform output -raw frontend_ecr_repository_url)" >> "$GITHUB_OUTPUT"
           echo "ecs_cluster_name=$(terraform output -raw ecs_cluster_name)" >> "$GITHUB_OUTPUT"
           echo "ecs_service_name=$(terraform output -raw ecs_service_name)" >> "$GITHUB_OUTPUT"
+          echo "frontend_ecs_service_name=$(terraform output -raw frontend_ecs_service_name)" >> "$GITHUB_OUTPUT"
           echo "ecs_task_family=$(terraform output -raw ecs_task_family)" >> "$GITHUB_OUTPUT"
+          echo "frontend_ecs_task_family=$(terraform output -raw frontend_ecs_task_family)" >> "$GITHUB_OUTPUT"
           echo "load_balancer_dns_name=$(terraform output -raw load_balancer_dns_name)" >> "$GITHUB_OUTPUT"
 
   terraform-pr-check:
@@ -213,8 +219,8 @@ jobs:
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
-        id: image
+      - name: Build and push backend Docker image
+        id: backend_image
         env:
           ECR_REPOSITORY_URL: ${{ needs.terraform.outputs.ecr_repository_url }}
           IMAGE_TAG: ${{ github.sha }}
@@ -224,10 +230,21 @@ jobs:
           docker push "$IMAGE_URI"
           echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
 
-      - name: Render ECS task definition
+      - name: Build and push frontend Docker image
+        id: frontend_image
+        env:
+          ECR_REPOSITORY_URL: ${{ needs.terraform.outputs.frontend_ecr_repository_url }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE_URI="${ECR_REPOSITORY_URL}:${IMAGE_TAG}"
+          docker build -t "$IMAGE_URI" ./client
+          docker push "$IMAGE_URI"
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      - name: Render backend ECS task definition
         env:
           TASK_FAMILY: ${{ needs.terraform.outputs.ecs_task_family }}
-          IMAGE_URI: ${{ steps.image.outputs.image_uri }}
+          IMAGE_URI: ${{ steps.backend_image.outputs.image_uri }}
         run: |
           aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --query taskDefinition > task-definition.json
           jq --arg image "$IMAGE_URI" '
@@ -241,19 +258,44 @@ jobs:
               .registeredBy
             )
             | .containerDefinitions[0].image = $image
-          ' task-definition.json > rendered-task-definition.json
+          ' task-definition.json > rendered-backend-task-definition.json
 
-      - name: Register ECS task definition
-        id: task
+      - name: Render frontend ECS task definition
+        env:
+          TASK_FAMILY: ${{ needs.terraform.outputs.frontend_ecs_task_family }}
+          IMAGE_URI: ${{ steps.frontend_image.outputs.image_uri }}
         run: |
-          TASK_DEFINITION_ARN="$(aws ecs register-task-definition --cli-input-json file://rendered-task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+          aws ecs describe-task-definition --task-definition "$TASK_FAMILY" --query taskDefinition > frontend-task-definition.json
+          jq --arg image "$IMAGE_URI" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions[0].image = $image
+          ' frontend-task-definition.json > rendered-frontend-task-definition.json
+
+      - name: Register backend ECS task definition
+        id: backend_task
+        run: |
+          TASK_DEFINITION_ARN="$(aws ecs register-task-definition --cli-input-json file://rendered-backend-task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)"
           echo "task_definition_arn=$TASK_DEFINITION_ARN" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy service to ECS Fargate
+      - name: Register frontend ECS task definition
+        id: frontend_task
+        run: |
+          TASK_DEFINITION_ARN="$(aws ecs register-task-definition --cli-input-json file://rendered-frontend-task-definition.json --query 'taskDefinition.taskDefinitionArn' --output text)"
+          echo "task_definition_arn=$TASK_DEFINITION_ARN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy backend service to ECS Fargate
         env:
           CLUSTER_NAME: ${{ needs.terraform.outputs.ecs_cluster_name }}
           SERVICE_NAME: ${{ needs.terraform.outputs.ecs_service_name }}
-          TASK_DEFINITION_ARN: ${{ steps.task.outputs.task_definition_arn }}
+          TASK_DEFINITION_ARN: ${{ steps.backend_task.outputs.task_definition_arn }}
         run: |
           aws ecs update-service \
             --cluster "$CLUSTER_NAME" \
@@ -262,12 +304,29 @@ jobs:
             --desired-count 2
           aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME"
 
-      - name: Verify service is running
+      - name: Deploy frontend service to ECS Fargate
         env:
           CLUSTER_NAME: ${{ needs.terraform.outputs.ecs_cluster_name }}
-          SERVICE_NAME: ${{ needs.terraform.outputs.ecs_service_name }}
+          SERVICE_NAME: ${{ needs.terraform.outputs.frontend_ecs_service_name }}
+          TASK_DEFINITION_ARN: ${{ steps.frontend_task.outputs.task_definition_arn }}
+        run: |
+          aws ecs update-service \
+            --cluster "$CLUSTER_NAME" \
+            --service "$SERVICE_NAME" \
+            --task-definition "$TASK_DEFINITION_ARN" \
+            --desired-count 2
+          aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME"
+
+      - name: Verify services are running
+        env:
+          CLUSTER_NAME: ${{ needs.terraform.outputs.ecs_cluster_name }}
+          BACKEND_SERVICE_NAME: ${{ needs.terraform.outputs.ecs_service_name }}
+          FRONTEND_SERVICE_NAME: ${{ needs.terraform.outputs.frontend_ecs_service_name }}
           LOAD_BALANCER_DNS: ${{ needs.terraform.outputs.load_balancer_dns_name }}
         run: |
-          RUNNING_COUNT="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$SERVICE_NAME" --query 'services[0].runningCount' --output text)"
-          test "$RUNNING_COUNT" -ge 1
+          BACKEND_RUNNING_COUNT="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$BACKEND_SERVICE_NAME" --query 'services[0].runningCount' --output text)"
+          FRONTEND_RUNNING_COUNT="$(aws ecs describe-services --cluster "$CLUSTER_NAME" --services "$FRONTEND_SERVICE_NAME" --query 'services[0].runningCount' --output text)"
+          test "$BACKEND_RUNNING_COUNT" -ge 1
+          test "$FRONTEND_RUNNING_COUNT" -ge 1
           curl --retry 10 --retry-delay 10 --fail "http://${LOAD_BALANCER_DNS}/api/health"
+          curl --retry 10 --retry-delay 10 --fail "http://${LOAD_BALANCER_DNS}/"

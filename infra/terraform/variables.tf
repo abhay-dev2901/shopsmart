@@ -22,6 +22,12 @@ variable "app_port" {
   default     = 5000
 }
 
+variable "frontend_port" {
+  description = "Container port exposed by the frontend service."
+  type        = number
+  default     = 80
+}
+
 variable "cpu" {
   description = "Fargate task CPU units."
   type        = number

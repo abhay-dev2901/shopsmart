@@ -71,8 +71,29 @@ resource "aws_ecr_repository" "backend" {
   tags = local.tags
 }
 
+resource "aws_ecr_repository" "frontend" {
+  name                 = "${local.name_prefix}-frontend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
+
+  tags = local.tags
+}
+
 resource "aws_cloudwatch_log_group" "backend" {
   name              = "/ecs/${local.name_prefix}-backend"
+  retention_in_days = 14
+  tags              = local.tags
+}
+
+resource "aws_cloudwatch_log_group" "frontend" {
+  name              = "/ecs/${local.name_prefix}-frontend"
   retention_in_days = 14
   tags              = local.tags
 }
@@ -151,6 +172,14 @@ resource "aws_vpc_security_group_ingress_rule" "ecs_from_alb" {
   to_port                      = var.app_port
 }
 
+resource "aws_vpc_security_group_ingress_rule" "ecs_frontend_from_alb" {
+  security_group_id            = aws_security_group.ecs.id
+  referenced_security_group_id = aws_security_group.alb.id
+  from_port                    = var.frontend_port
+  ip_protocol                  = "tcp"
+  to_port                      = var.frontend_port
+}
+
 resource "aws_vpc_security_group_egress_rule" "ecs_all" {
   security_group_id = aws_security_group.ecs.id
   cidr_ipv4         = "0.0.0.0/0"
@@ -166,7 +195,7 @@ resource "aws_lb" "app" {
 }
 
 resource "aws_lb_target_group" "backend" {
-  name        = "${local.name_prefix}-tg"
+  name        = "${local.name_prefix}-backend-tg"
   port        = var.app_port
   protocol    = "HTTP"
   target_type = "ip"
@@ -187,6 +216,28 @@ resource "aws_lb_target_group" "backend" {
   tags = local.tags
 }
 
+resource "aws_lb_target_group" "frontend" {
+  name        = "${local.name_prefix}-frontend-tg"
+  port        = var.frontend_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 3
+  }
+
+  tags = local.tags
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.app.arn
   port              = 80
@@ -194,7 +245,23 @@ resource "aws_lb_listener" "http" {
 
   default_action {
     type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+}
+
+resource "aws_lb_listener_rule" "backend_api" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
     target_group_arn = aws_lb_target_group.backend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
   }
 }
 
@@ -254,6 +321,47 @@ resource "aws_ecs_task_definition" "backend" {
   tags = local.tags
 }
 
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "${local.name_prefix}-frontend"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.cpu
+  memory                   = var.memory
+  execution_role_arn       = local.task_execution_role_arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "frontend"
+      image     = "public.ecr.aws/nginx/nginx:1.27-alpine"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.frontend_port
+          hostPort      = var.frontend_port
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.frontend.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+      healthCheck = {
+        command     = ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 10
+      }
+    }
+  ])
+
+  tags = local.tags
+}
+
 resource "aws_ecs_service" "backend" {
   name            = "${local.name_prefix}-backend"
   cluster         = aws_ecs_cluster.main.id
@@ -271,6 +379,33 @@ resource "aws_ecs_service" "backend" {
     target_group_arn = aws_lb_target_group.backend.arn
     container_name   = "backend"
     container_port   = var.app_port
+  }
+
+  lifecycle {
+    ignore_changes = [desired_count, task_definition]
+  }
+
+  depends_on = [aws_lb_listener_rule.backend_api]
+  tags       = local.tags
+}
+
+resource "aws_ecs_service" "frontend" {
+  name            = "${local.name_prefix}-frontend"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = var.desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    assign_public_ip = true
+    security_groups  = [aws_security_group.ecs.id]
+    subnets          = aws_subnet.public[*].id
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.frontend.arn
+    container_name   = "frontend"
+    container_port   = var.frontend_port
   }
 
   lifecycle {

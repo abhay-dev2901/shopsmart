@@ -8,6 +8,11 @@ output "ecr_repository_url" {
   value       = aws_ecr_repository.backend.repository_url
 }
 
+output "frontend_ecr_repository_url" {
+  description = "ECR repository URL for the frontend image."
+  value       = aws_ecr_repository.frontend.repository_url
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster name."
   value       = aws_ecs_cluster.main.name
@@ -18,9 +23,19 @@ output "ecs_service_name" {
   value       = aws_ecs_service.backend.name
 }
 
+output "frontend_ecs_service_name" {
+  description = "Frontend ECS service name."
+  value       = aws_ecs_service.frontend.name
+}
+
 output "ecs_task_family" {
   description = "ECS task definition family."
   value       = aws_ecs_task_definition.backend.family
+}
+
+output "frontend_ecs_task_family" {
+  description = "Frontend ECS task definition family."
+  value       = aws_ecs_task_definition.frontend.family
 }
 
 output "ecs_task_execution_role_arn" {
