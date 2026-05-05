@@ -21,6 +21,6 @@ Pipeline phases:
 
 1. Testing: runs backend unit/integration tests and frontend tests, then uploads JSON test reports and backend coverage.
 2. Terraform: initializes, formats, validates, plans, and applies infrastructure on pushes to `main`. Pull requests run Terraform format and validation only.
-3. ECS deployment: builds the backend and frontend Docker images, pushes them to ECR, updates both ECS Fargate services to two tasks, waits for service stability, and verifies the frontend root page plus backend `/api/health` through the load balancer.
+3. ECS deployment: builds the backend and frontend Docker images, pushes them to ECR, updates both ECS Fargate services to two tasks, waits for service stability, and verifies frontend `/health`, the frontend root page, and backend `/api/health` through the load balancer.
 
 Terraform lives in `infra/terraform` and provisions the required unique S3 bucket with versioning, encryption, and public access blocked, plus ECR, ECS Fargate, and load-balancer resources. The load balancer routes `/api/*` to the backend service and all other paths to the frontend service.

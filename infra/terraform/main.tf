@@ -228,7 +228,7 @@ resource "aws_lb_target_group" "frontend" {
     healthy_threshold   = 2
     interval            = 30
     matcher             = "200"
-    path                = "/"
+    path                = "/health"
     port                = "traffic-port"
     protocol            = "HTTP"
     timeout             = 5
@@ -350,7 +350,7 @@ resource "aws_ecs_task_definition" "frontend" {
         }
       }
       healthCheck = {
-        command     = ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+        command     = ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
