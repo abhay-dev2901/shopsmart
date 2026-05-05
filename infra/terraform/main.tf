@@ -195,7 +195,7 @@ resource "aws_lb" "app" {
 }
 
 resource "aws_lb_target_group" "backend" {
-  name        = "${local.name_prefix}-backend-tg"
+  name        = "${local.name_prefix}-tg"
   port        = var.app_port
   protocol    = "HTTP"
   target_type = "ip"
